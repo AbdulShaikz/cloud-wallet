@@ -1,5 +1,4 @@
 import { useState } from "react"
-import { generateWallet } from "../lib/wallet"
 import { useNavigate } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button"
@@ -8,20 +7,69 @@ import { Textarea } from "../components/ui/textarea"
 import { ThemeToggle } from "../components/ThemeToggle"
 import { EyeIcon, EyeOffIcon, CopyIcon, CheckIcon } from "lucide-react"
 import { toast } from "sonner"
+import { encryptSecretKey } from "../lib/crypto"
+import { setCachedPassword, getCachedPassword } from "../lib/passwordCache"
+import { generateWallet } from "../lib/wallet"
+import { PasswordPrompt } from "../components/PasswordPrompt"
 
 export default function GenerateWallet() {
-  const [wallet, setWallet] = useState<{ publicKey: string; secretKey: string } | null>(null)
+  const [wallet, setWallet] = useState<{
+    publicKey: string
+    secretKey: string 
+    encryptedSecretKey: string 
+  } | null>(null)
   const [showSecret, setShowSecret] = useState(false)
   const [copied, setCopied] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [passwordError, setPasswordError] = useState("")
+
+
+  const walletsExist = !!localStorage.getItem("wallets") && JSON.parse(localStorage.getItem("wallets") || "[]").length > 0
+  const cachedPassword = getCachedPassword()
   const navigate = useNavigate()
 
+  // no wallet exist and no password cached
+  const showPasswordSetup = !walletsExist && !cachedPassword
+
+  //wallet exist but no password cached
+  const showPasswordPrompt = walletsExist && !cachedPassword
+
   const handleGenerate = () => {
+    if (showPasswordSetup) {
+      if (!password || password.length < 6) {
+        setPasswordError("Password must be at least 6 characters")
+        return
+      }
+      if (password !== confirmPassword) {
+        setPasswordError("Passwords do not match")
+        return
+      }
+      setCachedPassword(password)
+      setPasswordError("")
+    }
+    const pwd = getCachedPassword() || password
+
     const newWallet = generateWallet()
-    setWallet(newWallet)
+    const encryptedSecret = encryptSecretKey(newWallet.secretKey, pwd)
+
+    setWallet({
+      publicKey: newWallet.publicKey,
+      secretKey: newWallet.secretKey,
+      encryptedSecretKey: encryptedSecret,
+    })
 
     const stored = JSON.parse(localStorage.getItem("wallets") || "[]")
-    localStorage.setItem("wallets", JSON.stringify([...stored, newWallet]))
-
+    localStorage.setItem(
+      "wallets",
+      JSON.stringify([
+        ...stored,
+        {
+          publicKey: newWallet.publicKey,
+          secretKey: encryptedSecret,
+        },
+      ])
+    )
     toast.success("Wallet Created!")
   }
 
@@ -29,6 +77,7 @@ export default function GenerateWallet() {
     navigator.clipboard.writeText(value)
     setCopied(label)
     setTimeout(() => setCopied(""), 1500)
+    toast.success(`${label === "public" ? "Public" : "Secret"} key copied!`)
   }
 
   return (
@@ -39,12 +88,47 @@ export default function GenerateWallet() {
           <CardTitle className="text-2xl font-bold text-primary dark:text-highlight">Generate New Wallet</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <Button 
-            onClick={handleGenerate} 
+          {/* If wallets exist and no password is cached, prompt for password unlock */}
+          {showPasswordPrompt && (
+            <PasswordPrompt
+              open={true}
+              onClose={() => {}}
+              encryptedKeySample={JSON.parse(localStorage.getItem("wallets") || "[]")[0]?.secretKey || ""}
+              onSuccess={(pwd) => {
+                setCachedPassword(pwd)
+              }}
+            />
+          )}
+
+          {/* if no wallets exist and no password is cached, show password setup */}
+          {showPasswordSetup && (
+            <div>
+              <label className="text-sm font-medium">Set Password</label>
+              <Input
+                type="password"
+                placeholder="Enter a strong password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <Input
+                type="password"
+                placeholder="Confirm password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="mt-2"
+              />
+              {passwordError && <p className="text-red-500 text-sm">{passwordError}</p>}
+            </div>
+          )}
+
+          <Button
+            onClick={handleGenerate}
             className="w-full"
+            disabled={showPasswordPrompt} // desable if waiting for unlock
           >
             Generate Wallet
           </Button>
+
           {wallet && (
             <div className="space-y-3">
               <div>
@@ -62,16 +146,19 @@ export default function GenerateWallet() {
                   </Button>
                 </div>
               </div>
-
               <div>
                 <label className="text-sm font-medium">Secret Key</label>
                 <div className="relative">
-                  <Textarea value={showSecret ? wallet.secretKey : "••••••••••••••••••••"} rows={3} readOnly />
+                  <Textarea
+                    value={showSecret ? wallet.secretKey : "••••••••••••••••••••"}
+                    rows={3}
+                    readOnly
+                  />
                   <div className="absolute right-2 top-2 flex items-center gap-2">
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => setShowSecret(prev => !prev)}
+                      onClick={() => setShowSecret((prev) => !prev)}
                       aria-label={showSecret ? "Hide secret key" : "Show secret key"}
                     >
                       {showSecret ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
@@ -88,18 +175,10 @@ export default function GenerateWallet() {
                 </div>
               </div>
               <div className="flex gap-2 pt-2">
-                <Button 
-                  variant="outline" 
-                  className="flex-1" 
-                  onClick={() => navigate("/dashboard")}
-                >
+                <Button variant="outline" className="flex-1" onClick={() => navigate("/dashboard")}>
                   Go to Dashboard
                 </Button>
-                <Button 
-                  variant="secondary" 
-                  className="flex-1" 
-                  onClick={() => navigate("/")}
-                >
+                <Button variant="secondary" className="flex-1" onClick={() => navigate("/")}>
                   Back to Home
                 </Button>
               </div>
