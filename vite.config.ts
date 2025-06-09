@@ -7,9 +7,13 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  define: {
+    'process.env': {},
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      buffer: 'buffer',
     },
   },
 })

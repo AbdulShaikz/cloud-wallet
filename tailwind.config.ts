@@ -12,7 +12,9 @@ const config: Config = {
         primary: "#9b5de5",
         accent: "#00f5d4",
         background: "#ffffff",
+        "background-dark": "#181825",
         foreground: "#121212",
+        highlight: "#f15bb5"
       }
     },
   },
