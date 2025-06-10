@@ -1,6 +1,6 @@
 # Cloud Wallet for Solana
 
-A simple, secure Solana wallet you can use directly in your browser—no extensions or cloud required.
+A simple, secure Solana wallet you can use directly in your browser -no extensions or cloud required.
 
 ## Features
 
