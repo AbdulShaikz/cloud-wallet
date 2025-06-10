@@ -10,6 +10,9 @@ import { Connection, Keypair, PublicKey, SystemProgram, Transaction } from "@sol
 import { getCachedPassword, setCachedPassword } from "../lib/passwordCache"
 import { decryptSecretKey } from "../lib/crypto"
 import { PasswordPrompt } from "../components/PasswordPrompt"
+import { NetworkSelector } from "../components/NetworkSelector"
+import { Badge } from "../components/ui/badge"
+import { BackButton } from "../components/BackButton"
 
 type Wallet = {
   publicKey: string
@@ -28,8 +31,7 @@ export default function Dashboard() {
   const [sending, setSending] = useState(false)
 
   const [askPassword, setAskPassword] = useState(false)
-
-  const connection = new Connection("https://api.devnet.solana.com")
+  const [network, setNetwork] = useState(() => localStorage.getItem("sol-network") || "devnet")
 
   useEffect(() => {
     const saved = localStorage.getItem("wallets")
@@ -40,10 +42,24 @@ export default function Dashboard() {
     }
   }, [])
 
+  useEffect(() => {
+    localStorage.setItem("sol-network", network)
+  }, [network])
+
+  useEffect(() => {
+    setBalances({})
+    setLoadingBalance({})
+  }, [network])
+
+  const endpoint =
+    network === "mainnet"
+      ? `https://solana-mainnet.g.alchemy.com/v2/${import.meta.env.VITE_ALCHEMY_API_KEY}`
+      : `https://solana-devnet.g.alchemy.com/v2/${import.meta.env.VITE_ALCHEMY_API_KEY}`
+  const connection = new Connection(endpoint)
   const handleCopy = (key: string, index: number) => {
     navigator.clipboard.writeText(key)
     setCopiedIndex(index)
-    toast("Public key copied!")
+    toast.success("Public key copied!")
     setTimeout(() => setCopiedIndex(null), 1500)
   }
 
@@ -60,11 +76,15 @@ export default function Dashboard() {
       const keypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKey)))
       const publicKey = keypair.publicKey
       const lamports = await connection.getBalance(publicKey)
-      const sol = (lamports / 1e9).toFixed(4)
-      setBalances(prev => ({ ...prev, [index]: sol }))
+      // if (lamports === 0 && network === "mainnet") {
+      //   toast.error("Wallet not found on Mainnet. It may not exist or have no funds.")
+      // }
+      const sol = lamports / 1e9
+      setBalances(prev => ({ ...prev, [index]: sol.toString() }))
     } catch (error) {
-      toast.error("Failed to check balance. Wrong password?")
+      toast.error("Failed to check balance. Wrong password or network?")
       setAskPassword(true)
+      setBalances(prev => ({ ...prev, [index]: "Error" }))
       console.error(error)
     } finally {
       setLoadingBalance(prev => ({ ...prev, [index]: false }))
@@ -105,9 +125,18 @@ export default function Dashboard() {
       setOpenModalIndex(null)
       setRecipient("")
       setAmount("")
-    } catch (err) {
-      toast.error("Failed to send. Check password or balance.")
-      setAskPassword(true)
+    } catch (err: any) {
+      // checking if it is a decryption error
+      if (
+        err.message?.toLowerCase().includes("utf-8") ||
+        err.message?.toLowerCase().includes("padding") ||
+        err.message?.toLowerCase().includes("decrypt")
+      ) {
+        setAskPassword(true)
+        toast.error("Wrong password. Please unlock your wallets.")
+      } else {
+        toast.error("Failed to send. Check your balance or network.")
+      }
       console.error(err)
     } finally {
       setSending(false)
@@ -116,6 +145,7 @@ export default function Dashboard() {
 
   return (
     <>
+      <BackButton />
       <PasswordPrompt
         open={askPassword}
         onClose={() => setAskPassword(false)}
@@ -125,10 +155,18 @@ export default function Dashboard() {
           setAskPassword(false)
         }}
       />
-      <div className="min-h-screen p-4 bg-background text-foreground">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-semibold">My Wallets</h1>
-          <ThemeToggle />
+      <div className="min-h-screen p-4 pt-12 bg-background text-foreground">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold">My Wallets</h1>
+            <Badge variant={network === "mainnet" ? "secondary" : "outline"}>
+              {network === "mainnet" ? "Mainnet" : "Devnet"}
+            </Badge>
+          </div>
+          <div className="flex gap-2 items-center">
+            <NetworkSelector value={network} onChange={setNetwork} />
+            <ThemeToggle />
+          </div>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {wallets.length === 0 && <p>No wallets found. Generate one first!</p>}
@@ -151,6 +189,7 @@ export default function Dashboard() {
                   {copiedIndex === index ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
                 </Button>
               </CardHeader>
+
               <CardContent className="space-y-2 text-sm break-all">
                 <p><strong>Public Key:</strong></p>
                 <p className="bg-muted p-2 rounded">{wallet.publicKey}</p>
@@ -191,6 +230,7 @@ export default function Dashboard() {
                   </Button>
                 </div>
               </CardContent>
+              
             </Card>
           ))}
           <Dialog
@@ -205,7 +245,12 @@ export default function Dashboard() {
           >
             <DialogContent className="bg-background dark:bg-background-dark">
               <DialogHeader>
-                <DialogTitle>Send SOL</DialogTitle>
+                <DialogTitle>
+                  Send SOL
+                  <Badge variant={network === "mainnet" ? "secondary" : "outline"} className="ml-2">
+                    {network === "mainnet" ? "Mainnet" : "Devnet"}
+                  </Badge>
+                </DialogTitle>
               </DialogHeader>
               <Input
                 type="text"

@@ -5,6 +5,7 @@ import { Button } from "./ui/button"
 import { Label } from "./ui/label"
 import { toast } from "sonner"
 import { decryptSecretKey } from "../lib/crypto"
+import { AlertTriangle } from "lucide-react"
 
 interface PasswordPromptProps {
   open: boolean
@@ -42,6 +43,12 @@ export function PasswordPrompt({ open, onClose, encryptedKeySample, onSuccess }:
           <DialogTitle>Enter Wallet Password</DialogTitle>
         </DialogHeader>
         <div className="space-y-2">
+          <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded">
+            <AlertTriangle className="text-yellow-500" size={18} />
+            <span className="text-xs text-yellow-700 dark:text-yellow-300">
+              If you forget your password, your wallets cannot be recovered.
+            </span>
+          </div>
           <Label htmlFor="password">Password</Label>
           <Input
             id="password"

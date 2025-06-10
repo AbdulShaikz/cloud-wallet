@@ -1,16 +1,18 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
 import { Textarea } from "../components/ui/textarea"
 import { ThemeToggle } from "../components/ThemeToggle"
-import { EyeIcon, EyeOffIcon, CopyIcon, CheckIcon } from "lucide-react"
+import { EyeIcon, EyeOffIcon, CopyIcon, CheckIcon, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
 import { encryptSecretKey } from "../lib/crypto"
 import { setCachedPassword, getCachedPassword } from "../lib/passwordCache"
 import { generateWallet } from "../lib/wallet"
 import { PasswordPrompt } from "../components/PasswordPrompt"
+import { NetworkSelector } from "../components/NetworkSelector"
+import { BackButton } from "../components/BackButton"
 
 export default function GenerateWallet() {
   const [wallet, setWallet] = useState<{
@@ -23,7 +25,7 @@ export default function GenerateWallet() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [passwordError, setPasswordError] = useState("")
-
+  const [network, setNetwork] = useState(() => localStorage.getItem("sol-network") || "devnet")
 
   const walletsExist = !!localStorage.getItem("wallets") && JSON.parse(localStorage.getItem("wallets") || "[]").length > 0
   const cachedPassword = getCachedPassword()
@@ -34,6 +36,10 @@ export default function GenerateWallet() {
 
   //wallet exist but no password cached
   const showPasswordPrompt = walletsExist && !cachedPassword
+
+  useEffect(() => {
+    localStorage.setItem("sol-network", network)
+  }, [network])
 
   const handleGenerate = () => {
     if (showPasswordSetup) {
@@ -82,6 +88,7 @@ export default function GenerateWallet() {
 
   return (
     <div className="min-h-screen bg-background text-foreground dark:bg-background-dark dark:text-white flex items-center justify-center px-4 transition-colors duration-300">
+      <BackButton/>
       <ThemeToggle />
       <Card className="max-w-md w-full shadow-xl bg-background dark:bg-background-dark border border-foreground/10 dark:border-white/10 transition-colors duration-300">
         <CardHeader>
@@ -103,6 +110,12 @@ export default function GenerateWallet() {
           {/* if no wallets exist and no password is cached, show password setup */}
           {showPasswordSetup && (
             <div>
+              <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded mb-2">
+                <AlertTriangle className="text-yellow-500" size={18} />
+                <span className="text-xs text-yellow-700 dark:text-yellow-300">
+                  If you forget your password, your wallets cannot be recovered.
+                </span>
+              </div>
               <label className="text-sm font-medium">Set Password</label>
               <Input
                 type="password"
@@ -120,6 +133,11 @@ export default function GenerateWallet() {
               {passwordError && <p className="text-red-500 text-sm">{passwordError}</p>}
             </div>
           )}
+
+          <div className="flex justify-between items-center mb-4">
+            <span className="font-semibold">Network:</span>
+            <NetworkSelector value={network} onChange={setNetwork} />
+          </div>
 
           <Button
             onClick={handleGenerate}

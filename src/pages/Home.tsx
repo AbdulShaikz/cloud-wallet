@@ -1,10 +1,17 @@
 import { Button } from '../components/ui/button'
 import { Link } from 'react-router-dom'
+import logo from '../assets/logo-1.png' 
 
 export default function Home() {
   return (
     <main className="min-h-screen flex flex-col justify-center items-center bg-background text-foreground px-4">
       <div className="text-center space-y-4">
+        <img
+          src={logo}
+          alt="Cloud Wallet Logo"
+          className="mx-auto my-auto w-64 h-64 drop-shadow-lg"
+          draggable={false}
+        />
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
           Cloud Wallet for Solana
         </h1>
